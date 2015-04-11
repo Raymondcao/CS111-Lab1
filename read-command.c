@@ -14,7 +14,7 @@
 #define stackSize 1024
 #define stringSize 1000
 
-int globvar = 0;
+int lineNum = 1;
 
 typedef struct stackCommand
 {
@@ -47,7 +47,7 @@ command_t stackCommandPop(stackCommand_t st)
 {
     if (stackCommandEmpty(st))
     {
-        error(1,0, "No item in stack");
+        error(1,0, "No item in stack, line: %d", lineNum);
     }
     command_t item = st->array[st->top];
     st->top--;
@@ -227,7 +227,7 @@ command_t stringToCommand (char* s)
                 if (output != -1)
                 {
                     //return error
-                    error(1,0, "multiple > in a command");
+                    error(1,0, "multiple > in a command, line: %d", lineNum);
                 }
                 if (cmd->u.word[wordCount][0] != '\0')
                 {
@@ -243,7 +243,7 @@ command_t stringToCommand (char* s)
                 if (input != -1)
                 {
                     //return error
-                    error(1,0, "multiple < in a command");
+                    error(1,0, "multiple < in a command, line: %d", lineNum);
                 }
                 if (cmd->u.word[wordCount][0] != '\0')
                 {
@@ -278,13 +278,13 @@ command_t stringToCommand (char* s)
     }
     
     if (cmd->input != NULL && cmd->input[0]=='\0')
-        error(1,0, "multiple < in a command");
+        error(1,0, "multiple < in a command, line: %d", lineNum);
     
     if (cmd->output != NULL && cmd->output[0]=='\0')
-        error(1,0, "multiple < in a command");
+        error(1,0, "multiple < in a command, line: %d", lineNum);
     
     if (cmd->u.word[0][0]=='\0')
-        error(1,0, "no word detected in command");
+        error(1,0, "no word detected in command, line: %d", lineNum);
     
     if (cmd->u.word[wordCount][0] == '\0')
         cmd->u.word[wordCount] = NULL;
@@ -330,7 +330,7 @@ void stackPushToStack(stackCommand_t stackCmd, stackCommand_t stackOper, command
             
             if (stackCmd->top < 1)
             {
-                error(1,0, "error in commands1");
+                error(1,0, "error in commands1, line: %d", lineNum);
                 return;
             }
             
@@ -350,12 +350,12 @@ void stackPushToStack(stackCommand_t stackCmd, stackCommand_t stackOper, command
     {
         if (stackOper->top ==0 &&stackCommandTop(stackOper)->type != SUBSHELL_COMMAND)
         {
-            error(1,0, "error in commands2");
+            error(1,0, "error in commands2, line: %d", lineNum);
             return;
         }
         if (stackCommandEmpty(stackOper))
         {
-            error(1,0, "error in commands3");
+            error(1,0, "error in commands3, line: %d", lineNum);
             return;
         }
         
@@ -364,13 +364,13 @@ void stackPushToStack(stackCommand_t stackCmd, stackCommand_t stackOper, command
             command_t popOperator = stackCommandPop(stackOper);
             if (stackOper->top == 0 && stackCommandTop(stackOper)->type != SUBSHELL_COMMAND)
             {
-                error(1,0, "error in commands4");
+                error(1,0, "error in commands4, line: %d", lineNum);
                 return;
             }
             
             if (stackCmd->top < 1)
             {
-                error(1,0, "error in commands5");
+                error(1,0, "error in commands5, line: %d", lineNum);
                 return;
             }
             
@@ -384,12 +384,10 @@ void stackPushToStack(stackCommand_t stackCmd, stackCommand_t stackOper, command
         command->u.subshell_command = stackCommandPop(stackCmd);
         stackCommandPush(stackCmd, command);
     }
-#ifdef Debug
     else
     {
-        printf("\nError in stackPushToStack\n");
+        error(1,0, "error in commands, line: %d", lineNum);
     }
-#endif
 }
 
 //Result will be saved in the only element in stackCmd
@@ -397,7 +395,7 @@ void stackCombine (stackCommand_t stackCmd, stackCommand_t stackOper)
 {
     if (stackOper ->top < 0 && stackCmd->top != 0)
     {
-        error(1,0, "error in commands6");
+        error(1,0, "error in commands6, line: %d", lineNum);
         return;
     }
     
@@ -406,7 +404,7 @@ void stackCombine (stackCommand_t stackCmd, stackCommand_t stackOper)
         command_t popOperator = stackCommandPop(stackOper);
         if (stackCmd->top < 1)
         {
-            error(1,0, "error in commands7");
+            error(1,0, "error in commands7, line: %d", lineNum);
             return;
         }
         
@@ -420,9 +418,7 @@ void stackCombine (stackCommand_t stackCmd, stackCommand_t stackOper)
     
     if (stackCmd->top != 0 || !stackCommandEmpty(stackOper))
     {
-        int debuginfo = stackCmd->top;
-        int debuginfo2 = stackOper->top;
-        error(1,0, "error in commands8  %d, %d",debuginfo,debuginfo2);
+        error(1,0, "error in commands8, line: %d", lineNum);
         return;
     }
 }
@@ -474,6 +470,7 @@ make_command_stream (int (*get_next_byte) (void *),
         {
             if (cget == '\n')
             {
+                lineNum++;
                 curState = prevState;
                 prevState = COMMENT;
             }
@@ -484,7 +481,7 @@ make_command_stream (int (*get_next_byte) (void *),
             if (cget != '&')
             {
                 //return error
-                error(1,0, "error in commands9, %c", cget);
+                error(1,0, "error in commands9, line: %d", lineNum);
                 return 0;
             }
             else
@@ -518,6 +515,8 @@ make_command_stream (int (*get_next_byte) (void *),
             }
             else if (cget ==' ' || cget =='\t' ||cget == '\n')
             {
+                if (cget == '\n')
+                    lineNum++;
                 prevState = LOOK_FOR_COMMAND;
                 curState = LOOK_FOR_COMMAND;
                 command_t pipe = initPipe();
@@ -525,7 +524,7 @@ make_command_stream (int (*get_next_byte) (void *),
             }
             else
             {
-                error(1,0, "error in commands10, %c", cget);
+                error(1,0, "error in commands10, line: %d", lineNum);
                 return 0;
             }
         }
@@ -542,6 +541,8 @@ make_command_stream (int (*get_next_byte) (void *),
             }
             else if (cget ==' '||cget =='\t' || cget =='\n')
             {
+                if (cget == '\n')
+                    lineNum++;
                 continue;
             }
             else if (cget == '(')
@@ -552,10 +553,10 @@ make_command_stream (int (*get_next_byte) (void *),
             else if (cget == ')')
             {
                 //CAUTION: need to work
-                error(1,0, "error in commands11, %c", cget);
+                error(1,0, "error in commands11, line: %d", lineNum);
             }
             else{
-                error(1,0, "error in commands12, %c", cget);
+                error(1,0, "error in commands12, line: %d", lineNum);
             }
         }
         
@@ -574,6 +575,7 @@ make_command_stream (int (*get_next_byte) (void *),
             {
                 if (cget == '\n')
                 {
+                    lineNum++;
                     newlineCount++;
                     if (newlineCount == 2)
                     {
@@ -590,7 +592,7 @@ make_command_stream (int (*get_next_byte) (void *),
             }
             else if (cget == ';')
             {
-                error(1,0, "error in commands13, %c", cget);
+                error(1,0, "error in commands13, line: %d", lineNum);
             }
             else if (cget == '(' || cget == ')')
             {
@@ -605,7 +607,7 @@ make_command_stream (int (*get_next_byte) (void *),
                 }
             }
             else
-                error(1,0, "error in commands13, %c", cget);
+                error(1,0, "error in commands13, line: %d", lineNum);
         }
         
         else if (curState == NORMAL)
@@ -638,7 +640,7 @@ make_command_stream (int (*get_next_byte) (void *),
                         curState = LOOK_FOR_AND;
                         
                         if (newlineCount != 0)
-                            error(1,0, "error in commands17");
+                            error(1,0, "error in commands17, line: %d", lineNum);
                         
                         if (buffer[0] != '\0')
                         {
@@ -650,7 +652,7 @@ make_command_stream (int (*get_next_byte) (void *),
                         
                     case '|':
                         if (newlineCount != 0)
-                            error(1,0, "error in commands18");
+                            error(1,0, "error in commands18, line: %d", lineNum);
 
                         prevState = curState;
                         curState = LOOK_FOR_OR;
@@ -663,11 +665,12 @@ make_command_stream (int (*get_next_byte) (void *),
                         }
                         else
                         {
-                            error(1,0, "error in commands14");
+                            error(1,0, "error in commands14, line: %d", lineNum);
                         }
                         break;
                         
                     case '\n':
+                        lineNum++;
                         newlineCount++;
                         if (buffer[0] != '\0')
                         {
@@ -691,7 +694,7 @@ make_command_stream (int (*get_next_byte) (void *),
                         
                     case ';':
                         if (newlineCount != 0)
-                            error(1,0, "error in commands19");
+                            error(1,0, "error in commands19, line: %d", lineNum);
 
                         if (!stackCommandEmpty(stackOper))
                         {
@@ -716,7 +719,7 @@ make_command_stream (int (*get_next_byte) (void *),
                         stackPushToStack(stackCmd, stackOper, sequence);
                         break;
                     case '(':
-                        error(1,0, "error in commands15, %c", cget);
+                        error(1,0, "error in commands15, line: %d", lineNum);
                         break;
                     case ')':
                         newlineCount = 0;
@@ -730,11 +733,10 @@ make_command_stream (int (*get_next_byte) (void *),
                         stackPushToStack(stackCmd, stackOper, subshell);
                         break;
                     default:
-                        error(1,0, "error in commands16, %c", cget);
+                        error(1,0, "error in commands16, line: %d", lineNum);
                 }
             }
         }
-        globvar++;
     }while(cget !=EOF);
     
     //Combine two stacks
