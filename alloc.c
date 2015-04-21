@@ -2,7 +2,7 @@
 
 #include "alloc.h"
 
-//#include <error.h>
+#include <error.h>
 #include <errno.h>
 #include <stdlib.h>
 
