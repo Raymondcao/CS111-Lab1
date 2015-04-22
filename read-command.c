@@ -418,7 +418,7 @@ void stackCombine (stackCommand_t stackCmd, stackCommand_t stackOper)
     
     if (stackCmd->top != 0 || !stackCommandEmpty(stackOper))
     {
-        error(1,0, "error in commands8, line: %d", lineNum);
+        error(1,0, "error in commands8, line: %d %d, %d", lineNum, stackCmd->top, stackOper->top);
         return;
     }
 }
@@ -457,9 +457,8 @@ make_command_stream (int (*get_next_byte) (void *),
                 stackPushToStack(stackCmd, stackOper,curCommand);
                 resetString(buffer);
             }
-            break;
         }
-        if (cget == '#' && curState != COMMENT)
+        else if (cget == '#' && curState != COMMENT)
         {
             prevState = curState;
             curState = COMMENT;
@@ -473,6 +472,20 @@ make_command_stream (int (*get_next_byte) (void *),
                 lineNum++;
                 curState = prevState;
                 prevState = COMMENT;
+                if (curState != LOOK_FOR_COMMAND)
+                {
+                    newlineCount++;
+                    if (newlineCount == 2 && stackCmd->top != -1)
+                    {
+                        // start a new commandNode
+                        stackCombine(stackCmd, stackOper);
+                        curNode->command = stackCommandPop(stackCmd);
+                        //two stacks are all empty now & can reuse without reset
+                        commandNode_t new = initCommandNode();
+                        curNode->next = new;
+                        curNode= new;
+                    }
+                }
             }
         }
         
@@ -577,7 +590,7 @@ make_command_stream (int (*get_next_byte) (void *),
                 {
                     lineNum++;
                     newlineCount++;
-                    if (newlineCount == 2)
+                    if (newlineCount == 2 && stackCmd->top != -1)
                     {
                         // start a new commandNode
                         stackCombine(stackCmd, stackOper);
@@ -740,9 +753,12 @@ make_command_stream (int (*get_next_byte) (void *),
     }while(cget !=EOF);
     
     //Combine two stacks
-    stackCombine(stackCmd, stackOper);
-    curNode->command = stackCommandPop(stackCmd);
-    commandStream->tail = curNode;
+    if (stackCmd->top != -1)
+    {
+        stackCombine(stackCmd, stackOper);
+        curNode->command = stackCommandPop(stackCmd);
+        commandStream->tail = curNode;
+    }
     
   /* FIXME: Replace this with your implementation.  You may need to
      add auxiliary functions and otherwise modify the source code.
