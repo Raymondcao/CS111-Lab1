@@ -70,11 +70,6 @@ enum read_state
     START_COMMAND   //after ; /n
 };
 
-/* FIXME: You may need to add #include directives, macro definitions,
-   static function definitions, etc.  */
-
-/* FIXME: Define the type 'struct command_stream' here.  This should
-   complete the incomplete type declaration in command.h.  */
 
 typedef struct commandNode
 {
