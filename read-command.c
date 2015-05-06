@@ -70,27 +70,14 @@ enum read_state
     START_COMMAND   //after ; /n
 };
 
-
-typedef struct commandNode
-{
-    struct command *command;
-    struct commandNode *next;
-}commandNode, *commandNode_t;
-
 commandNode_t initCommandNode()
 {
-    commandNode_t new = checked_malloc(sizeof(commandNode));
+    commandNode_t new = checked_malloc(sizeof(struct commandNode));
     new->command = NULL;
     new->next = NULL;
     return new;
 }
 
-struct command_stream
-{
-    struct commandNode *head;
-    struct commandNode *tail;
-    struct commandNode *cursor;
-};
 
 command_stream_t initCommandStream()
 {
@@ -476,6 +463,9 @@ make_command_stream (int (*get_next_byte) (void *),
                         stackCombine(stackCmd, stackOper);
                         curNode->command = stackCommandPop(stackCmd);
                         //two stacks are all empty now & can reuse without reset
+                        
+                        commandStream->tail = curNode;
+
                         commandNode_t new = initCommandNode();
                         curNode->next = new;
                         curNode= new;
@@ -591,6 +581,9 @@ make_command_stream (int (*get_next_byte) (void *),
                         stackCombine(stackCmd, stackOper);
                         curNode->command = stackCommandPop(stackCmd);
                         //two stacks are all empty now & can reuse without reset
+                        
+                        commandStream->tail = curNode;
+                        
                         commandNode_t new = initCommandNode();
                         curNode->next = new;
                         curNode= new;
@@ -694,6 +687,8 @@ make_command_stream (int (*get_next_byte) (void *),
                             stackCombine(stackCmd, stackOper);
                             curNode->command = stackCommandPop(stackCmd);
                             
+                            commandStream->tail = curNode;
+                            
                             commandNode_t new = initCommandNode();
                             curNode->next = new;
                             curNode = new;
@@ -754,7 +749,10 @@ make_command_stream (int (*get_next_byte) (void *),
         curNode->command = stackCommandPop(stackCmd);
         commandStream->tail = curNode;
     }
-    
+    else//When the last command is empty, need to pop the last command
+    {
+        commandStream->tail->next = NULL;
+    }
   /* FIXME: Replace this with your implementation.  You may need to
      add auxiliary functions and otherwise modify the source code.
      You can also use external functions defined in the GNU C Library.  */

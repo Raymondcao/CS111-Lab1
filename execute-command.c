@@ -3,7 +3,6 @@
 #include "command.h"
 #include "command-internals.h"
 #include "alloc.h"
-#include "read-command.c"
 
 #include <error.h>
 #include <unistd.h>
@@ -11,7 +10,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 #define QueueSize 1000
 #define ListSize 100
@@ -19,42 +18,25 @@
 /* FIXME: You may need to add #include directives, macro definitions,
    static function definitions, etc.  */
 
-typedef struct GraphNode{
-    command_t command;
-    struct GraphNode ** before;
-    pid_t pid;
-}GraphNode;
-
-GraphNode* initGraphNode(){
-    GraphNode* new = checked_malloc(sizeof(GraphNode));
+GraphNode_t initGraphNode(){
+    GraphNode_t new = checked_malloc(sizeof(struct GraphNode));
     new->pid = -1;
     return new;
 }
 
-typedef struct{
-    GraphNode* array[QueueSize];
-    int front;
-    int rear;
-}QueueGraphNode;
-
-typedef struct{
-    QueueGraphNode *no_dependencies;
-    QueueGraphNode *dependencies;
-}DependencyGraph;
-
-QueueGraphNode* initQueue(){
-    QueueGraphNode* new = checked_malloc(sizeof(QueueGraphNode));
+QueueGraphNode_t initQueue(){
+    QueueGraphNode_t new = checked_malloc(sizeof(struct QueueGraphNode));
     new->front = 0;
     new->rear = -1;
     return new;
 }
 
-void QueueInsert(QueueGraphNode *queue, GraphNode *node){
+void QueueInsert(QueueGraphNode_t queue, GraphNode_t node){
     queue->rear += 1;
     queue->array[queue->rear] = node;
 }
 
-GraphNode* QueuePopFront(QueueGraphNode *queue){
+GraphNode_t QueuePopFront(QueueGraphNode_t queue){
     if (queue->rear-queue->front < 0)
         error(1, 0, "Cannot pop item in a empty queue");
     
@@ -63,7 +45,7 @@ GraphNode* QueuePopFront(QueueGraphNode *queue){
     return queue->array[popItem];
 }
 
-int QueueLen(QueueGraphNode *queue){
+int QueueLen(QueueGraphNode_t queue){
     return (queue->rear-queue->front+1);
 }
 
@@ -99,6 +81,9 @@ int writeList(command_t command, char** wl, int listPos){
 }
 
 int readList(command_t command, char** rl, int listPos){
+    if (command == NULL){
+        return listPos;
+    }
     switch (command->type) {
         case SIMPLE_COMMAND:
             if (command->input != NULL)
@@ -108,15 +93,16 @@ int readList(command_t command, char** rl, int listPos){
             }
             int i = 1;
             while (command->u.word[i] != NULL){
-                if (command->u.word[i][2] == '\0')
+                if (command->u.word[i][0] == '\0' || command->u.word[i][1] == '\0')
                     continue;
                 rl[listPos] = command->u.word[i];
                 i++;
+                listPos++;
             }
             break;
         case SEQUENCE_COMMAND:
             listPos = readList(command->u.command[0], rl, listPos);
-            if (command->u.word[1] != NULL)
+            if (command->u.command[1] != NULL)
                 listPos = readList(command->u.command[1], rl, listPos);
             break;
         case PIPE_COMMAND:
@@ -140,7 +126,7 @@ int Dependency(char** child, char** parent){
     int i= 0, j=0;
     while (parent[i] != NULL){
         while (child[j] != NULL){
-            if (parent[i] == child[j])
+            if (!strcmp(parent[i], child[j]))
                 return 1;
             j++;
         }
@@ -149,23 +135,26 @@ int Dependency(char** child, char** parent){
     return 0;
 }
 
-DependencyGraph* createGraph(command_stream_t command_stream){
+DependencyGraph_t createGraph(command_stream_t stream){
     //Initialize DependencyGraph
-    DependencyGraph *new = checked_malloc(sizeof(DependencyGraph));
+    DependencyGraph_t new = checked_malloc(sizeof(struct DependencyGraph));
     new->no_dependencies = initQueue();
     new->dependencies = initQueue();
     
-    
-    GraphNode** nodes = checked_malloc(ArraySize*sizeof(GraphNode*));
+    struct GraphNode** nodes = checked_malloc(ArraySize*sizeof(GraphNode_t));
     char*** writeLists = checked_malloc(ArraySize*sizeof(char**));
     char*** readLists = checked_malloc(ArraySize*sizeof(char**));
     int readListPos = 0;
     int writeListPos = 0;
 
     int i = 0;//i is index for command trees
-    commandNode_t currentNode = command_stream->head;
+    commandNode_t currentNode = stream->head;
     
     do{
+        //Initialize new write/read list
+        writeLists[i] = checked_malloc(ListSize*sizeof(char*));
+        readLists[i] = checked_malloc(ListSize*sizeof(char*));
+        
         //for each command tree
         nodes[i]= initGraphNode();
         nodes[i]->command = currentNode->command;
@@ -181,31 +170,29 @@ DependencyGraph* createGraph(command_stream_t command_stream){
             //determine dependency
             if (Dependency(readLists[j], writeLists[i])){//WAR
                 if (k==0)//assign memory
-                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode*));
+                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode_t));
                 
                 nodes[i]->before[k] = nodes[j];
                 k++;
                 continue;
             }
 
-            if (Dependency(writeLists[j], readLists[i])){//RAW
+            else if (Dependency(writeLists[j], readLists[i])){//RAW
                 if (k==0)//assign memory
-                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode*));
+                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode_t));
                 
                 nodes[i]->before[k] = nodes[j];
                 k++;
                 continue;
             }
             
-            if (Dependency(writeLists[j], writeLists[i])){//WAW
+            else if (Dependency(writeLists[j], writeLists[i])){//WAW
                 if (k==0)//assign memory
-                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode*));
+                    nodes[i]->before = checked_malloc(ArraySize*sizeof(GraphNode_t));
                 
                 nodes[i]->before[k] = nodes[j];
                 k++;
             }
-
-
         }
         
         //add the graphNode to dependency queue
@@ -223,11 +210,12 @@ DependencyGraph* createGraph(command_stream_t command_stream){
     return new;
 }
 
-void executeNoDependencies(QueueGraphNode *no_dependencies){
+void executeNoDependencies(QueueGraphNode_t no_dependencies){
     int i;
-    for (i=0; i< QueueLen(no_dependencies); i++)
+    int len = QueueLen(no_dependencies);
+    for (i=0; i< len; i++)
     {
-        GraphNode *node = QueuePopFront(no_dependencies);
+        GraphNode_t node = QueuePopFront(no_dependencies);
         
         pid_t pid = fork();
         if (pid == 0){
@@ -240,11 +228,12 @@ void executeNoDependencies(QueueGraphNode *no_dependencies){
     return;
 }
 
-void executeDependencies(QueueGraphNode *dependencies){
+void executeDependencies(QueueGraphNode_t dependencies){
     int i;
-    for (i=0; i< QueueLen(dependencies); i++)
+    int len = QueueLen(dependencies);
+    for (i=0; i< len; i++)
     {
-        GraphNode *node = QueuePopFront(dependencies);
+        GraphNode_t node = QueuePopFront(dependencies);
         
         if (node->before == NULL)
             error(1,0,"Non-dependent graphNode in dependencies list");
@@ -253,6 +242,7 @@ void executeDependencies(QueueGraphNode *dependencies){
         int j=0;
         while (node->before[j] != NULL){
             waitpid(node->before[j]->pid, &status, 0);
+            j++;
         }
         
         pid_t pid =fork();
@@ -266,7 +256,7 @@ void executeDependencies(QueueGraphNode *dependencies){
     return;
 }
 
-int executeGraph(DependencyGraph *graph){
+int executeGraph(DependencyGraph_t graph){
     executeNoDependencies(graph->no_dependencies);
     executeDependencies(graph->dependencies);
     return 0;
@@ -409,9 +399,6 @@ void execute_pipe_command(command_t c)
 void
 execute_command (command_t c, bool time_travel)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
     switch (c->type) {
         case SIMPLE_COMMAND:
             execute_simple_command(c);

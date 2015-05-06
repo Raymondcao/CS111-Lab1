@@ -1,4 +1,5 @@
 // UCLA CS 111 Lab 1 command internals
+#define QueueSize 1000
 
 enum command_type
   {
@@ -33,4 +34,35 @@ struct command
     // for SUBSHELL_COMMAND:
     struct command *subshell_command;
   } u;
+};
+
+struct command_stream
+{
+    struct commandNode *head;
+    struct commandNode *tail;
+    struct commandNode *cursor;
+};
+
+struct commandNode
+{
+    struct command *command;
+    struct commandNode *next;
+};
+
+struct DependencyGraph
+{
+    QueueGraphNode_t no_dependencies;
+    QueueGraphNode_t dependencies;
+};
+
+struct QueueGraphNode{
+    GraphNode_t array[QueueSize];
+    int front;
+    int rear;
+};
+
+struct GraphNode{
+    command_t command;
+    struct GraphNode ** before;
+    pid_t pid;
 };

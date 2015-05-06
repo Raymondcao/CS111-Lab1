@@ -5,8 +5,9 @@
 #include <getopt.h>
 #include <stdio.h>
 
+#include "alloc.h"
 #include "command.h"
-#include "execute-command.c"
+#include "command-internals.h"
 
 static char const *program_name;
 static char const *script_name;
@@ -55,7 +56,7 @@ options_exhausted:;
     command_t last_command = NULL;
     command_t command;
     if(time_travel){
-        DependencyGraph *graph = createGraph(command_stream);
+        DependencyGraph_t graph = createGraph(command_stream);
         int finalStatus = 0;
         finalStatus = executeGraph(graph);
     }

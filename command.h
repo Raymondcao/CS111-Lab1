@@ -1,9 +1,14 @@
 // UCLA CS 111 Lab 1 command interface
 
 #include <stdbool.h>
+#include <unistd.h>
 
 typedef struct command *command_t;
 typedef struct command_stream *command_stream_t;
+typedef struct commandNode *commandNode_t;
+typedef struct DependencyGraph *DependencyGraph_t;
+typedef struct QueueGraphNode *QueueGraphNode_t;
+typedef struct GraphNode *GraphNode_t;
 
 /* Create a command stream from GETBYTE and ARG.  A reader of
    the command stream will invoke GETBYTE (ARG) to get the next byte.
@@ -24,3 +29,7 @@ void execute_command (command_t, bool);
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */
 int command_status (command_t);
+
+DependencyGraph_t createGraph(command_stream_t stream);
+
+int executeGraph(struct DependencyGraph *graph);
